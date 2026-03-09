@@ -21,8 +21,8 @@ use url::Url;
 const ACCEPT_HEADER: &str = "application/xml, text/xml;q=0.9, */*;q=0.1";
 
 pub struct Client {
-    client: reqwest::Client,
-    endpoint: Url,
+    pub client: reqwest::Client,
+    pub endpoint: Url,
 }
 
 impl Client {

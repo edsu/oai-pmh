@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use mockito::{Matcher, ServerGuard};
+    use reqwest;
     use oai_pmh::client::{
         Client,
         query::{GetRecordArgs, ListIdentifiersArgs, ListMetadataFormatsArgs, ListRecordsArgs},
@@ -193,5 +194,39 @@ mod tests {
         }
 
         mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_custom_client() {
+        let mut server = mockito::Server::new_async().await;
+
+        let xml =
+            std::fs::read_to_string("tests/fixtures/identify.xml").expect("Failed to load fixture");
+
+        let mock = server
+            .mock("GET", "/")
+            .match_query(Matcher::UrlEncoded("verb".into(), "Identify".into()))
+            .match_header("authorization", "Bearer abc123")
+            .with_status(200)
+            .with_header("content-type", "text/xml")
+            .with_body(xml)
+            .create_async()
+            .await;
+
+        let mut client = Client::new(&server.url()).unwrap();
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("Authorization", "Bearer abc123".parse().unwrap());
+
+        let custom_client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+
+        client.client = custom_client;
+
+        let _ = client.identify().await.unwrap();
+
+        mock.assert_async().await;
     }
 }
