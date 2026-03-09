@@ -5,6 +5,7 @@ mod tests {
         Client,
         query::{GetRecordArgs, ListIdentifiersArgs, ListMetadataFormatsArgs, ListRecordsArgs},
     };
+    use reqwest::header::HeaderMap;
 
     fn setup_mock_server(
         server: &mut ServerGuard,
@@ -143,6 +144,58 @@ mod tests {
         }
 
         mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_custom_request_headers() {
+        let mut server = mockito::Server::new_async().await;
+
+        let xml =
+            std::fs::read_to_string("tests/fixtures/identify.xml").expect("Failed to load fixture");
+
+        let mock = server
+            .mock("GET", "/")
+            .match_query(Matcher::UrlEncoded("verb".into(), "Identify".into()))
+            .match_header("x-api-key", "secret")
+            .with_status(200)
+            .with_header("content-type", "text/xml")
+            .with_body(xml)
+            .create_async()
+            .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert("x-api-key", "secret".parse().unwrap());
+
+        let client = Client::new(&server.url()).unwrap().with_headers(headers);
+        let _ = client.identify().await.unwrap();
+
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_custom_headers_override_defaults() {
+        let mut server = mockito::Server::new_async().await;
+
+        let xml =
+            std::fs::read_to_string("tests/fixtures/identify.xml").expect("Failed to load fixture");
+
+        let mock = server
+            .mock("GET", "/")
+            .match_query(Matcher::UrlEncoded("verb".into(), "Identify".into()))
+            .match_header("user-agent", "custom-agent/1.0")
+            .with_status(200)
+            .with_header("content-type", "text/xml")
+            .with_body(xml)
+            .create_async()
+            .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert("user-agent", "custom-agent/1.0".parse().unwrap());
+
+        let client = Client::new(&server.url()).unwrap().with_headers(headers);
+        let _ = client.identify().await.unwrap();
+
+        mock.assert_async().await;
     }
 
     #[tokio::test]
